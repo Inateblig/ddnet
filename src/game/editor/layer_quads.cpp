@@ -26,8 +26,13 @@ CLayerQuads::~CLayerQuads() = default;
 void CLayerQuads::Render(bool QuadPicker)
 {
 	Graphics()->TextureClear();
-	if(m_Image >= 0 && (size_t)m_Image < m_pEditor->m_Map.m_vpImages.size())
-		Graphics()->TextureSet(m_pEditor->m_Map.m_vpImages[m_Image]->m_Texture);
+	if (!m_pEditor->m_Preview) {
+		if(m_Image >= 0 && (size_t)m_Image < m_pEditor->m_Map.m_vpImages.size())
+			Graphics()->TextureSet(m_pEditor->m_Map.m_vpImages[m_Image]->m_Texture);
+	} else {
+		if(m_Image >= 0 && (size_t)m_Image < m_pEditor->m_PreviewMap.m_vpImages.size())
+			Graphics()->TextureSet(m_pEditor->m_PreviewMap.m_vpImages[m_Image]->m_Texture);
+	}
 
 	Graphics()->BlendNone();
 	m_pEditor->RenderTools()->ForceRenderQuads(m_vQuads.data(), m_vQuads.size(), LAYERRENDERFLAG_OPAQUE, m_pEditor->EnvelopeEval, m_pEditor);

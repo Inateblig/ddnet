@@ -772,6 +772,7 @@ public:
 		m_aFilesSelectedName[0] = '\0';
 		m_pFileDialogPath = m_aFileDialogCurrentFolder;
 		m_FileDialogOpening = false;
+		m_aLoadedFilename[0] = '\0';
 		m_FilesSelectedIndex = -1;
 
 		m_FilePreviewImage.Invalidate();
@@ -819,6 +820,7 @@ public:
 		m_QuadKnifeActive = false;
 		m_QuadKnifeCount = 0;
 
+		m_Preview = false;
 		m_CheckerTexture.Invalidate();
 		m_BackgroundTexture.Invalidate();
 		m_CursorTexture.Invalidate();
@@ -957,6 +959,7 @@ public:
 		int m_StorageType;
 		time_t m_TimeModified;
 	};
+	char m_aLoadedFilename[IO_MAX_PATH_LENGTH];
 	std::vector<CFilelistItem> m_vCompleteFileList;
 	std::vector<const CFilelistItem *> m_vpFilteredFileList;
 
@@ -1116,6 +1119,8 @@ public:
 	static const void *ms_pUiGotContext;
 
 	CEditorMap m_Map;
+	CEditorMap m_PreviewMap;
+	bool m_Preview;
 	int m_ShiftBy;
 
 	static void EnvelopeEval(int TimeOffsetMillis, int Env, ColorRGBA &Channels, void *pUser);
@@ -1214,6 +1219,7 @@ public:
 	void DoSoundSource(CSoundSource *pSource, int Index);
 
 	void DoMapEditor(CUIRect View);
+	void DoMapPreview(CUIRect View);
 	void DoToolbar(CUIRect Toolbar);
 	void DoQuad(CQuad *pQuad, int Index);
 	ColorRGBA GetButtonColor(const void *pID, int Checked);

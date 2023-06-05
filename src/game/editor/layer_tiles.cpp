@@ -106,8 +106,15 @@ void CLayerTiles::MakePalette()
 
 void CLayerTiles::Render(bool Tileset)
 {
-	if(m_Image >= 0 && (size_t)m_Image < m_pEditor->m_Map.m_vpImages.size())
-		m_Texture = m_pEditor->m_Map.m_vpImages[m_Image]->m_Texture;
+	Graphics()->TextureClear();
+	if (!m_pEditor->m_Preview) {
+		if(m_Image >= 0 && (size_t)m_Image < m_pEditor->m_Map.m_vpImages.size())
+			m_Texture = m_pEditor->m_Map.m_vpImages[m_Image]->m_Texture;
+	} else {
+		if(m_Image >= 0 && (size_t)m_Image < m_pEditor->m_PreviewMap.m_vpImages.size())
+			m_Texture = m_pEditor->m_PreviewMap.m_vpImages[m_Image]->m_Texture;
+	}
+
 	Graphics()->TextureSet(m_Texture);
 	ColorRGBA Color = ColorRGBA(m_Color.r / 255.0f, m_Color.g / 255.0f, m_Color.b / 255.0f, m_Color.a / 255.0f);
 	Graphics()->BlendNone();

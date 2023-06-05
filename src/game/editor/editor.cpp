@@ -296,13 +296,22 @@ void CEditorImage::AnalyseTileFlags()
 void CEditor::EnvelopeEval(int TimeOffsetMillis, int Env, ColorRGBA &Channels, void *pUser)
 {
 	CEditor *pThis = (CEditor *)pUser;
-	if(Env < 0 || Env >= (int)pThis->m_Map.m_vpEnvelopes.size())
+	bool invalid;
+	if(!pThis->m_Preview)
+		invalid = Env >= (int)pThis->m_Map.m_vpEnvelopes.size();
+	else
+		invalid = Env >= (int)pThis->m_PreviewMap.m_vpEnvelopes.size();
+	if(Env < 0 || invalid)
 	{
 		Channels = ColorRGBA();
 		return;
 	}
 
-	CEnvelope *pEnv = pThis->m_Map.m_vpEnvelopes[Env];
+	CEnvelope *pEnv;
+	if(!pThis->m_Preview)
+		pEnv = pThis->m_Map.m_vpEnvelopes[Env];
+	else
+		pEnv = pThis->m_PreviewMap.m_vpEnvelopes[Env];
 	float t = pThis->m_AnimateTime;
 	t *= pThis->m_AnimateSpeed;
 	t += (TimeOffsetMillis / 1000.0f);
@@ -3033,6 +3042,28 @@ void CEditor::DoMapEditor(CUIRect View)
 	UI()->MapScreen();
 }
 
+void CEditor::DoMapPreview(CUIRect View)
+{
+	UI()->ClipEnable(&View);
+
+	if(Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN))
+		m_PreviewMap.m_pEditor->ChangeZoom(20.0f);
+	if(Input()->KeyPress(KEY_MOUSE_WHEEL_UP))
+		m_PreviewMap.m_pEditor->ChangeZoom(-20.0f);
+
+	m_PreviewMap.m_pEditor->m_PreviewZoom = true;
+	// render all good stuff
+	for(auto &pGroup : m_PreviewMap.m_vpGroups)
+	{
+		if(pGroup->m_Visible) {
+			pGroup->Render();
+		}
+	}
+
+	UI()->ClipDisable();
+	UI()->MapScreen();
+}
+
 float CEditor::ScaleFontSize(char *pText, int TextSize, float FontSize, int Width)
 {
 	while(TextRender()->TextWidth(FontSize, pText, -1, -1.0f) > Width)
@@ -4596,7 +4627,7 @@ void CEditor::RenderFileDialog()
 	View.HSplitBottom(14.0f, &View, &FileBox);
 	FileBox.VSplitLeft(55.0f, &FileBoxLabel, &FileBox);
 	View.HSplitBottom(10.0f, &View, nullptr); // some spacing
-	if(m_FileDialogFileType == CEditor::FILETYPE_IMG)
+	if(m_FileDialogFileType == CEditor::FILETYPE_IMG || g_Config.m_EdLivePreview == 1)
 		View.VSplitMid(&View, &Preview);
 
 	// title
@@ -4655,12 +4686,29 @@ void CEditor::RenderFileDialog()
 
 	// pathbox
 	char aPath[IO_MAX_PATH_LENGTH], aBuf[128 + IO_MAX_PATH_LENGTH];
-	if(m_FilesSelectedIndex != -1)
+	if(m_FilesSelectedIndex != -1) {
 		Storage()->GetCompletePath(m_vpFilteredFileList[m_FilesSelectedIndex]->m_StorageType, m_pFileDialogPath, aPath, sizeof(aPath));
-	else
+		const char *filename = m_vpFilteredFileList[m_FilesSelectedIndex]->m_aFilename;
+		if(g_Config.m_EdLivePreview == 1 && str_endswith(filename, ".map")) {
+			m_Preview = true;
+
+			if(str_comp(filename, m_aLoadedFilename)) {
+				str_copy(m_aLoadedFilename, filename);
+				char aBuffer[IO_MAX_PATH_LENGTH];
+				str_format(aBuffer, sizeof(aBuffer), "%s/%s", m_pFileDialogPath, m_aLoadedFilename);
+				int st = m_vpFilteredFileList[m_FilesSelectedIndex]->m_StorageType;
+				m_PreviewMap.Load(Kernel()->RequestInterface<IStorage>(), aBuffer, st);
+			}
+
+			DoMapPreview(Preview);
+		} else {
+			m_Preview = false;
+		}
+	} else {
 		aPath[0] = 0;
 	str_format(aBuf, sizeof(aBuf), "Current path: %s", aPath);
 	UI()->DoLabel(&PathBox, aBuf, 10.0f, TEXTALIGN_ML);
+	}
 
 	// filebox
 	static CListBox s_ListBox;
@@ -4863,6 +4911,7 @@ void CEditor::RenderFileDialog()
 	static int s_CancelButton = 0;
 	static int s_RefreshButton = 0;
 	static int s_ShowDirectoryButton = 0;
+	static int s_ShowPreviewButton = 0;
 	static int s_DeleteButton = 0;
 	static int s_NewFolderButton = 0;
 
@@ -4936,6 +4985,16 @@ void CEditor::RenderFileDialog()
 		{
 			ShowFileDialogError("Failed to open the directory '%s'.", aPath);
 		}
+	}
+
+	ButtonBar.VSplitRight(ButtonSpacing, &ButtonBar, nullptr);
+	ButtonBar.VSplitRight(90.0f, &ButtonBar, &Button);
+	if(DoButton_Editor(&s_ShowPreviewButton, "Show preview", 0, &Button, 0, "Shows map preview on the right"))
+	{
+		if(!g_Config.m_EdLivePreview)
+			g_Config.m_EdLivePreview = 1;
+		else
+			g_Config.m_EdLivePreview = 0;
 	}
 
 	ButtonBar.VSplitRight(ButtonSpacing, &ButtonBar, nullptr);
@@ -6733,6 +6792,7 @@ void CEditor::Init()
 	});
 	m_RenderTools.Init(m_pGraphics, m_pTextRender);
 	m_Map.m_pEditor = this;
+	m_PreviewMap.m_pEditor = this;
 
 	m_CheckerTexture = Graphics()->LoadTexture("editor/checker.png", IStorage::TYPE_ALL, CImageInfo::FORMAT_AUTO, 0);
 	m_BackgroundTexture = Graphics()->LoadTexture("editor/background.png", IStorage::TYPE_ALL, CImageInfo::FORMAT_AUTO, 0);
